@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: circleci-testcontainers-example
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
