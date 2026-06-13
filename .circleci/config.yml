@@ -1,0 +1,31 @@
+version: 2.1
+
+jobs:
+  integration-test:
+    machine:
+      image: ubuntu-2204:current
+
+    steps:
+      - checkout
+
+      - run:
+          name: Install Java and Maven
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y openjdk-17-jdk maven
+
+      - run:
+          name: Check Docker, Java and Maven
+          command: |
+            docker version
+            java -version
+            mvn -version
+
+      - run:
+          name: Run tests with Testcontainers
+          command: mvn clean verify
+
+workflows:
+  build-and-test:
+    jobs:
+      - integration-test
