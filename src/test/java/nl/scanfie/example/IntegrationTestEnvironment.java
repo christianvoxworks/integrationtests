@@ -1,9 +1,9 @@
 package nl.scanfie.example;
 
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.MountableFile;
 
 import java.time.Duration;
@@ -12,9 +12,9 @@ final class IntegrationTestEnvironment {
 
     private static final Network network = Network.newNetwork();
 
-    private static final MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.4")
+    private static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17")
             .withNetwork(network)
-            .withNetworkAliases("mysql")
+            .withNetworkAliases("postgres")
             .withDatabaseName("example_test")
             .withUsername("test")
             .withPassword("test");
@@ -22,18 +22,18 @@ final class IntegrationTestEnvironment {
     private static final GenericContainer<?> tomcat = new GenericContainer<>("tomcat:10.1-jdk17")
             .withNetwork(network)
             .withExposedPorts(8080)
-            .dependsOn(mysql)
+            .dependsOn(postgres)
             .withCopyFileToContainer(
                     MountableFile.forHostPath("target/circleci-testcontainers-example-0.0.1-SNAPSHOT.war"),
                     "/usr/local/tomcat/webapps/integrationtests.war"
             )
-            .withEnv("SPRING_DATASOURCE_URL", "jdbc:mysql://mysql:3306/example_test")
+            .withEnv("SPRING_DATASOURCE_URL", "jdbc:postgresql://postgres:5432/example_test")
             .withEnv("SPRING_DATASOURCE_USERNAME", "test")
             .withEnv("SPRING_DATASOURCE_PASSWORD", "test")
-            .withEnv("SPRING_DATASOURCE_DRIVER_CLASS_NAME", "com.mysql.cj.jdbc.Driver")
+            .withEnv("SPRING_DATASOURCE_DRIVER_CLASS_NAME", "org.postgresql.Driver")
             .withEnv("SPRING_JPA_HIBERNATE_DDL_AUTO", "create-drop")
             .withEnv("SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_AUTO", "create-drop")
-            .withEnv("SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT", "org.hibernate.dialect.MySQLDialect")
+            .withEnv("SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT", "org.hibernate.dialect.PostgreSQLDialect")
             .waitingFor(
                     Wait.forHttp("/integrationtests")
                             .forStatusCodeMatching(statusCode -> statusCode < 500)
@@ -44,8 +44,8 @@ final class IntegrationTestEnvironment {
     }
 
     static synchronized void start() {
-        if (!mysql.isRunning()) {
-            mysql.start();
+        if (!postgres.isRunning()) {
+            postgres.start();
         }
 
         if (!tomcat.isRunning()) {
@@ -58,8 +58,8 @@ final class IntegrationTestEnvironment {
             tomcat.stop();
         }
 
-        if (mysql.isRunning()) {
-            mysql.stop();
+        if (postgres.isRunning()) {
+            postgres.stop();
         }
 
         network.close();
