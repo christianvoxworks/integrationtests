@@ -19,6 +19,15 @@ final class IntegrationTestEnvironment {
             .withUsername("test")
             .withPassword("test");
 
+    private static final GenericContainer<?> redis = new GenericContainer<>("redis:7")
+            .withNetwork(network)
+            .withNetworkAliases("redis")
+            .withExposedPorts(6379)
+            .waitingFor(
+                    Wait.forListeningPort()
+                            .withStartupTimeout(Duration.ofMinutes(1))
+            );
+
     private static final GenericContainer<?> tomcat = new GenericContainer<>("tomcat:10.1-jdk17")
             .withNetwork(network)
             .withExposedPorts(8080)
@@ -34,6 +43,8 @@ final class IntegrationTestEnvironment {
             .withEnv("SPRING_JPA_HIBERNATE_DDL_AUTO", "create-drop")
             .withEnv("SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_AUTO", "create-drop")
             .withEnv("SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT", "org.hibernate.dialect.PostgreSQLDialect")
+            .withEnv("SPRING_DATA_REDIS_HOST", "redis")
+            .withEnv("SPRING_DATA_REDIS_PORT", "6379")
             .waitingFor(
                     Wait.forHttp("/integrationtests")
                             .forStatusCodeMatching(statusCode -> statusCode < 500)
@@ -48,6 +59,10 @@ final class IntegrationTestEnvironment {
             postgres.start();
         }
 
+        if (!redis.isRunning()) {
+            redis.start();
+        }
+
         if (!tomcat.isRunning()) {
             tomcat.start();
         }
@@ -56,6 +71,10 @@ final class IntegrationTestEnvironment {
     static synchronized void stop() {
         if (tomcat.isRunning()) {
             tomcat.stop();
+        }
+
+        if (redis.isRunning()) {
+            redis.stop();
         }
 
         if (postgres.isRunning()) {
