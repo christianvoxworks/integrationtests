@@ -14,7 +14,7 @@ public class ApplicationHealthIT extends AbstractIntegrationTest {
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Test
-    public void shouldStartApplicationInTomcatWithMysql() throws Exception {
+    public void shouldStartApplicationInTomcatWithPostgressAndRedis() throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl()))
                 .GET()

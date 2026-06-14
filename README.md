@@ -7,7 +7,8 @@ This example shows how to run Spring Boot integration tests with Testcontainers 
 - Spring Boot 3.5
 - Java 17
 - Spring Data JPA
-- MySQL Testcontainer
+- Postgres Testcontainer
+- Redis Testcontainer
 - Maven Failsafe integration test setup
 - CircleCI `machine` executor with Docker available
 
@@ -17,7 +18,7 @@ This example shows how to run Spring Boot integration tests with Testcontainers 
 mvn clean verify
 ```
 
-The integration test starts a real MySQL 8.4 container and verifies a JPA repository.
+The integration test starts a real Postgress container and verifies a JPA repository.
 
 ## CircleCI
 
