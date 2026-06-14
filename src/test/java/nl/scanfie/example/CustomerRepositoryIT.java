@@ -1,4 +1,4 @@
-package nl.xeelas.example;
+package nl.scanfie.example;
 
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;

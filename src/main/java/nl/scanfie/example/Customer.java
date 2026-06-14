@@ -1,4 +1,4 @@
-package nl.xeelas.example;
+package nl.scanfie.example;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

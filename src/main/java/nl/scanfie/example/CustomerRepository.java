@@ -1,4 +1,4 @@
-package nl.xeelas.example;
+package nl.scanfie.example;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
