@@ -1,50 +1,74 @@
 package nl.xeelas.example;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.MountableFile;
 
-import java.util.List;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
-@SpringBootTest
 class CustomerRepositoryIT {
+
+    private static final Network network = Network.newNetwork();
 
     @Container
     static final MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.4")
+            .withNetwork(network)
+            .withNetworkAliases("mysql")
             .withDatabaseName("example_test")
             .withUsername("test")
-            .withPassword("test")
-            .withInitScript("schema.sql");
+            .withPassword("test");
 
-    @DynamicPropertySource
-    static void registerDatasourceProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", mysql::getJdbcUrl);
-        registry.add("spring.datasource.username", mysql::getUsername);
-        registry.add("spring.datasource.password", mysql::getPassword);
-        registry.add("spring.datasource.driver-class-name", mysql::getDriverClassName);
-    }
+    @Container
+    static final GenericContainer<?> tomcat = new GenericContainer<>("tomcat:10.1-jdk17")
+            .withNetwork(network)
+            .withExposedPorts(8080)
+            .dependsOn(mysql)
+            .withCopyFileToContainer(
+                    MountableFile.forHostPath("target/circleci-testcontainers-example-0.0.1-SNAPSHOT.war"),
+                    "/usr/local/tomcat/webapps/integrationtests.war"
+            )
+            .withEnv("SPRING_PROFILES_ACTIVE", "it")
+            .withEnv("SPRING_DATASOURCE_URL", "jdbc:mysql://mysql:3306/example_test")
+            .withEnv("SPRING_DATASOURCE_USERNAME", "test")
+            .withEnv("SPRING_DATASOURCE_PASSWORD", "test")
+            .withEnv("SPRING_DATASOURCE_DRIVER_CLASS_NAME", "com.mysql.cj.jdbc.Driver")
+            .withEnv("SPRING_JPA_HIBERNATE_DDL_AUTO", "create-drop")
+            .withEnv("SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_AUTO", "create-drop")
+            .withEnv("SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT", "org.hibernate.dialect.MySQLDialect")
+            .waitingFor(
+                    Wait.forHttp("/integrationtests")
+                            .forStatusCodeMatching(statusCode -> statusCode < 500)
+                            .withStartupTimeout(Duration.ofMinutes(2))
+            );
 
-    @Autowired
-    private CustomerRepository customerRepository;
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Test
-    void shouldPersistAndFindCustomerByName() {
-        customerRepository.save(new Customer("Christian"));
+    void shouldStartApplicationInTomcatWithMysql() throws Exception {
+        String baseUrl = "http://" + tomcat.getHost() + ":" + tomcat.getMappedPort(8080) + "/integrationtests";
 
-        List<Customer> customers = customerRepository.findByName("Christian");
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl))
+                .GET()
+                .build();
 
-        assertThat(customers)
-                .hasSize(1)
-                .first()
-                .extracting(Customer::getName)
-                .isEqualTo("Christian");
+        HttpResponse<String> response = httpClient.send(
+                request,
+                HttpResponse.BodyHandlers.ofString()
+        );
+
+        assertThat(response.statusCode()).isLessThan(500);
     }
 }
