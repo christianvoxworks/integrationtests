@@ -4,6 +4,9 @@ jobs:
   integration-test:
     machine:
       image: ubuntu-2204:current
+    environment:
+      DOCKER_API_VERSION: "1.40"
+
 
     steps:
       - checkout
