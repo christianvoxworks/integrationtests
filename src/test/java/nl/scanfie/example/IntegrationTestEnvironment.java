@@ -1,37 +1,25 @@
 package nl.scanfie.example;
 
-import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.MountableFile;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@Testcontainers
-class CustomerRepositoryIT {
+final class IntegrationTestEnvironment {
 
     private static final Network network = Network.newNetwork();
 
-    @Container
-    static final MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.4")
+    private static final MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.4")
             .withNetwork(network)
             .withNetworkAliases("mysql")
             .withDatabaseName("example_test")
             .withUsername("test")
             .withPassword("test");
 
-    @Container
-    static final GenericContainer<?> tomcat = new GenericContainer<>("tomcat:10.1-jdk17")
+    private static final GenericContainer<?> tomcat = new GenericContainer<>("tomcat:10.1-jdk17")
             .withNetwork(network)
             .withExposedPorts(8080)
             .dependsOn(mysql)
@@ -39,7 +27,6 @@ class CustomerRepositoryIT {
                     MountableFile.forHostPath("target/circleci-testcontainers-example-0.0.1-SNAPSHOT.war"),
                     "/usr/local/tomcat/webapps/integrationtests.war"
             )
-            .withEnv("SPRING_PROFILES_ACTIVE", "it")
             .withEnv("SPRING_DATASOURCE_URL", "jdbc:mysql://mysql:3306/example_test")
             .withEnv("SPRING_DATASOURCE_USERNAME", "test")
             .withEnv("SPRING_DATASOURCE_PASSWORD", "test")
@@ -53,22 +40,36 @@ class CustomerRepositoryIT {
                             .withStartupTimeout(Duration.ofMinutes(2))
             );
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private IntegrationTestEnvironment() {
+    }
 
-    @Test
-    void shouldStartApplicationInTomcatWithMysql() throws Exception {
-        String baseUrl = "http://" + tomcat.getHost() + ":" + tomcat.getMappedPort(8080) + "/integrationtests";
+    static synchronized void start() {
+        if (!mysql.isRunning()) {
+            mysql.start();
+        }
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl))
-                .GET()
-                .build();
+        if (!tomcat.isRunning()) {
+            tomcat.start();
+        }
+    }
 
-        HttpResponse<String> response = httpClient.send(
-                request,
-                HttpResponse.BodyHandlers.ofString()
-        );
+    static synchronized void stop() {
+        if (tomcat.isRunning()) {
+            tomcat.stop();
+        }
 
-        assertThat(response.statusCode()).isLessThan(500);
+        if (mysql.isRunning()) {
+            mysql.stop();
+        }
+
+        network.close();
+    }
+
+    static String baseUrl() {
+        if (!tomcat.isRunning()) {
+            throw new IllegalStateException("Tomcat container is not running");
+        }
+
+        return "http://" + tomcat.getHost() + ":" + tomcat.getMappedPort(8080) + "/integrationtests";
     }
 }
